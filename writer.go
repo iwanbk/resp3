@@ -2,6 +2,7 @@ package resp3
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"strconv" // for converting integers to strings
 )
@@ -22,6 +23,43 @@ func NewWriter(writer io.Writer) *Writer {
 	return &Writer{
 		Writer: bufio.NewWriter(writer),
 	}
+}
+
+func (w *Writer) SendCommands(args ...interface{}) error {
+	// write the array flag
+	w.WriteByte(TypeArray)
+	w.WriteString(strconv.Itoa(len(args)))
+	w.Write(CRLFByte)
+
+	for _, arg := range args {
+		switch v := arg.(type) {
+		case string:
+			w.writeString(v)
+		case int64:
+			w.writeString(strconv.FormatInt(v, 10))
+		case int:
+			w.writeString(strconv.FormatInt(int64(v), 10))
+		case []byte:
+			w.writeString(string(v))
+		case bool:
+			w.writeString(strconv.FormatBool(v))
+		case float32:
+			w.writeString(strconv.FormatFloat(float64(v), 'g', -1, 64))
+		case float64:
+			w.writeString(strconv.FormatFloat(v, 'g', -1, 64))
+		default:
+			return fmt.Errorf("unsupported data type: %v", arg)
+		}
+	}
+	return w.Flush()
+}
+
+func (w *Writer) writeString(str string) {
+	w.WriteByte(TypeBlobString)
+	w.WriteString(strconv.Itoa(len(str)))
+	w.Write(CRLFByte)
+	w.WriteString(str)
+	w.Write(CRLFByte)
 }
 
 // WriteCommand writes a redis command.
